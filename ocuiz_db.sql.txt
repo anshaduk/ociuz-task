@@ -1,0 +1,156 @@
+#CREATE DB
+create database ociuz_db;
+
+# connect db ociuz_db
+\c ociuz_db; 
+
+#CREATE TABLE - Users
+create table users(user_id serial primary key,name varchar(255) not null,email varchar(255) unique not null,registration_date timestamp default current_timestamp);
+
+#CREATE TABLE - Products
+create table products(product_id serial primary key,name varchar(255) not null,category varchar(100) not null,price decimal(10,2) not null,stock int not null);
+
+#CREATE TABLE - Transactions
+create table transactions(transaction_id serial primary key,user_id int references users(user_id),date timestamp default current_timestamp);
+
+#CREATE TABLE - Transaction Details
+create table transactions_details(transaction_id int references transactions(transaction_id),product_id int references products(product_id),quantity int not null,primary key(transaction_id,product_id));
+
+#ADDING SAMPLE DATA
+
+#users Table
+INSERT INTO users (name, email) VALUES('John', 'john@gmail.com'),('Sam', 'sam@gmail.com'),('Alice', 'alice@gmail.com'),('Bob', 'bob@gmail.com'),('Charlie', 'charlie@gmail.com');
+
+user_id |  name   |       email       |     registration_date
+---------+---------+-------------------+----------------------------
+       1 | John    | john@gmail.com    | 2025-01-13 12:57:03.337945
+       2 | Sam     | sam@gmail.com     | 2025-01-13 12:57:03.337945
+       3 | Alice   | alice@gmail.com   | 2025-01-13 12:57:03.337945
+       4 | Bob     | bob@gmail.com     | 2025-01-13 12:57:03.337945
+       5 | Charlie | charlie@gmail.com | 2025-01-13 12:57:03.337945
+(5 rows)
+
+
+#Products Table
+insert into products(name,category,price,stock) values('Apple','Fruit',68.75,1000),('Banana','Fruit',70,1500),('Tomato','Fruit',17.50,1000),('Laptop','Electronics',35000,100),('Phone','Electronics',10000,100),('Chair', 'Furniture', 50.00, 200),('Table', 'Furniture', 120.00, 80),('Shirt', 'Clothing', 30.00, 250),('Book', 'Books', 15.00, 500);
+
+ product_id |  name  |  category   |  price   | stock
+------------+--------+-------------+----------+-------
+          1 | Apple  | Fruit       |    68.75 |  1000
+          2 | Banana | Fruit       |    70.00 |  1500
+          3 | Tomato | Fruit       |    17.50 |  1000
+          4 | Laptop | Electronics | 35000.00 |   100
+          5 | Phone  | Electronics | 10000.00 |   100
+          6 | Chair  | Furniture   |    50.00 |   200
+          7 | Table  | Furniture   |   120.00 |    80
+          8 | Shirt  | Clothing    |    30.00 |   250
+          9 | Book   | Books       |    15.00 |   500
+         10 | Pen    | Stationery  |     2.00 |  1000
+(10 rows)
+
+
+#Transactions Table
+insert into transactions(user_id,date) values (1,'2025-01-13'),
+(2,'2025-01-03'),(3,'2025-01-03');
+
+transaction_id | user_id |        date
+----------------+---------+---------------------
+              1 |       1 | 2025-01-13 00:00:00
+              2 |       2 | 2025-01-03 00:00:00
+              3 |       3 | 2025-01-03 00:00:00
+(3 rows)
+
+
+
+#Transaction Details Table
+insert into transactions_details(transaction_id,product_id,quantity) values(1,1,3),(2,2,50),(3,3,25);
+
+ transaction_id | product_id | quantity
+----------------+------------+----------
+              1 |          1 |        3
+              2 |          2 |       50
+              3 |          3 |       25
+(3 rows)
+
+
+
+#Retrieve users with purchases in last 30 days
+select distinct u.user_id,u.name,u.email from users u join transactions t on u.user_id=t.user_id where t.date > current_date - interval '30 days';
+
+
+ user_id | name  |      email
+---------+-------+-----------------
+       3 | Alice | alice@gmail.com
+       1 | John  | john@gmail.com
+       2 | Sam   | sam@gmail.com
+(3 rows)
+
+
+#Identify top 3 products by purchase frequency
+select p.name,sum(td.quantity) as total_quantity from products p join transactions_details td on p.product_id = td.product_id group by p.product_id order by total_quantity desc limit 3;
+
+ name  | total_quantity
+--------+----------------
+ Banana |             50
+ Tomato |             25
+ Apple  |              3
+(3 rows)
+
+
+#Calculate revenue per product category
+select p.category,sum(p.price*td.quantity) as revenue from products p join transactions_details td on p.product_id = td.product_id group by p.category;
+
+category | revenue
+----------+---------
+ Fruit    | 4143.75
+(1 row)
+
+
+#Generate transaction summaries with item counts
+select t.transaction_id,count(td.product_id) as item_count from transactions t join transactions_details td on t.transaction_id = td.transaction_id group by t.transaction_id;
+
+ transaction_id | item_count
+----------------+------------
+              2 |          1
+              3 |          1
+              1 |          1
+(3 rows)
+
+
+
+#Find users exceeding $500 in total purchases
+select u.user_id,u.name,sum(p.price*td.quantity) as total_purchase from users u join transactions t on u.user_id = t.user_id join transactions_details td on t.transaction_id = td.transaction_id join products p on td.product_id = p.product_id group by u.user_id having sum(p.price*td.quantity)>500;
+
+ user_id | name | total_purchase
+---------+------+----------------
+       2 | Sam  |        3500.00
+(1 row)
+
+
+
+#Function to Calculate Remaining Stock for a Product
+
+create or replace function calculate_remaining_stock(product_id int)
+return int as $$
+declare
+    remaining_stock int;
+begin
+    
+    select stock - COALESCE(sum(td.quantity), 0)
+    into remaining_stock
+    FROM products p
+    LEFT JOIN transactions_details td ON p.product_id = td.product_id
+    WHERE p.product_id = $1 
+    GROUP BY p.product_id;
+
+    return remaining_stock;
+end;
+$$ language plpgsql;
+
+ #select calculate_remaining_stock(1);
+
+ calculate_remaining_stock
+---------------------------
+                       997
+(1 row)
+
