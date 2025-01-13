@@ -16,7 +16,7 @@ A simple React app that allows users to manage tasks with functionalities such a
 2. Navigate to the directory where you want to clone the project.
 3. Run the following command to clone the repository:
 
-git clone 
+git clone https://github.com/anshaduk/ociuz-task.git
 
 ## Install Dependencies
 Before running the project, you need to install the necessary dependencies.
